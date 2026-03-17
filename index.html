@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CourtStat</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CourtStat">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#f97316">
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08090b;
+  --surface: #0f1115;
+  --surface2: #161921;
+  --surface3: #1e2229;
+  --border: #272d38;
+  --border2: #323a47;
+  --orange: #f97316;
+  --orange-glow: rgba(249,115,22,0.18);
+  --gold: #fbbf24;
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,0.15);
+  --red: #f43f5e;
+  --red-dim: rgba(244,63,94,0.15);
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --muted2: #94a3b8;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow Condensed', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content:'';
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(249,115,22,0.06) 0%, transparent 70%),
+    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(255,255,255,0.012) 60px),
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(255,255,255,0.012) 60px);
+}
+header {
+  position:sticky; top:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 24px; height:56px;
+  padding-top: env(safe-area-inset-top);
+  background:rgba(8,9,11,0.97);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(16px);
+}
+.logo { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:4px; }
+.logo em { color:var(--orange); font-style:normal; }
+
+/* ── TOP NAV: desktop only ── */
+.nav { display:flex; gap:4px; }
+.nav-btn {
+  padding:7px 16px; border-radius:4px; border:none;
+  background:transparent; color:var(--muted);
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:14px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  cursor:pointer; transition:all 0.18s;
+}
+.nav-btn:hover { color:var(--text); }
+.nav-btn.active { background:var(--orange); color:#000; }
+
+/* ── BOTTOM TAB BAR: mobile only ── */
+.tab-bar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  background: rgba(10,11,14,0.98);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-bar-inner {
+  display: flex;
+  height: 56px;
+}
+.tab-btn {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn .tab-icon { font-size: 20px; line-height: 1; }
+.tab-btn.active { color: var(--orange); }
+.tab-btn.active .tab-icon { filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
+
+main {
+  position:relative; z-index:1;
+  padding:24px; max-width:960px; margin:0 auto;
+}
+
+@media(max-width: 768px) {
+  /* Hide top nav on mobile, show bottom tab bar */
+  .nav { display: none; }
+  .tab-bar { display: block; }
+  /* Push content up so bottom tab bar doesn't cover it */
+  main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  header { justify-content: center; }
+}
+.view { display:none; animation:fadeIn 0.22s ease; }
+.view.active { display:block; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.page-title { font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:3px; margin-bottom:4px; }
+.page-sub { font-size:13px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:24px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:22px; }
+.card + .card { margin-top:16px; }
+.card-label { font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--orange); margin-bottom:14px; }
+.field-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.field { flex:1; min-width:120px; }
+label { display:block; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+input, select {
+  width:100%; padding:10px 14px;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:5px; color:var(--text);
+  font-family:'Barlow Condensed',sans-serif; font-size:16px;
+  outline:none; transition:border-color 0.18s;
+}
+input:focus, select:focus { border-color:var(--orange); }
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 22px; border-radius:5px; border:none; cursor:pointer;
+  font-family:'Bebas Neue',sans-serif; font-size:17px; letter-spacing:1.5px;
+  transition:all 0.16s; white-space:nowrap;
+}
+.btn-primary { background:var(--orange); color:#000; }
+.btn-primary:hover { background:#fb923c; transform:translateY(-1px); box-shadow:0 4px 20px rgba(249,115,22,0.35); }
+.btn-ghost { background:transparent; color:var(--muted2); border:1px solid var(--border); }
+.btn-ghost:hover { border-color:var(--border2); color:var(--text); }
+
+/* PLAYER PREVIEW */
+.player-preview {
+  display:flex; align-items:center; gap:20px;
+  background:linear-gradient(135deg, var(--surface2) 0%, var(--surface) 100%);
+  border:1px solid var(--border2); border-radius:10px; padding:20px 24px;
+  margin-bottom:20px;
+}
+.preview-num {
+  font-family:'Bebas Neue',sans-serif; font-size:64px; line-height:1;
+  color:var(--orange); min-width:64px; text-align:center;
+  text-shadow:0 0 30px rgba(249,115,22,0.4);
+}
+.preview-info .name { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px; }
+.preview-info .meta { font-size:14px; color:var(--muted); letter-spacing:1px; margin-top:2px; }
+
+/* FINALIZE MODAL */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,0.72); backdrop-filter:blur(6px);
+  align-items:center; justify-content:center;
+}
+.modal-overlay.open { display:flex; }
+.modal-box {
+  background:var(--surface); border:1px solid var(--orange);
+  border-radius:12px; padding:32px; width:100%; max-width:420px;
+  animation:modalPop 0.22s ease;
+  margin: 16px;
+}
+@keyframes modalPop { from{transform:scale(0.93);opacity:0} to{transform:none;opacity:1} }
+.modal-title {
+  font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:3px;
+  color:var(--text); margin-bottom:6px;
+}
+.modal-sub { font-size:13px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:24px; }
+.modal-score-row {
+  display:grid; grid-template-columns:1fr auto 1fr;
+  align-items:center; gap:12px; margin-bottom:24px;
+}
+.modal-team { text-align:center; }
+.modal-team-label { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+.modal-score-input {
+  font-family:'Bebas Neue',sans-serif; font-size:52px; line-height:1;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; color:var(--gold);
+  width:100%; text-align:center; outline:none; padding:8px 4px;
+  transition:border-color 0.18s;
+}
+.modal-score-input:focus { border-color:var(--orange); }
+.modal-vs { font-family:'Bebas Neue',sans-serif; font-size:22px; color:var(--border2); text-align:center; }
+.modal-result-preview {
+  text-align:center; margin-bottom:20px; min-height:28px;
+  font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:2px;
+}
+.modal-actions { display:flex; gap:10px; }
+.modal-actions .btn { flex:1; }
+
+/* STAT BUBBLES */
+.stat-panel {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px;
+}
+.stat-bubble {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:14px 10px; text-align:center;
+  position:relative; overflow:hidden; transition:border-color 0.2s;
+}
+.stat-bubble::before {
+  content:''; position:absolute; inset:0;
+  background:var(--bubble-color,transparent);
+  opacity:0; transition:opacity 0.3s;
+}
+.stat-bubble.flash::before { animation:flashBubble 0.45s ease forwards; }
+@keyframes flashBubble { 0%{opacity:0.55} 100%{opacity:0} }
+.stat-bubble-label { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:4px; position:relative; }
+.stat-bubble-val {
+  font-family:'IBM Plex Mono',monospace; font-size:32px; font-weight:600; line-height:1; position:relative;
+}
+.stat-bubble-val.pop { animation:numPop 0.25s ease; }
+@keyframes numPop { 0%{transform:scale(1.45)} 100%{transform:scale(1)} }
+.bubble-pts .stat-bubble-val { color:var(--gold); }
+.bubble-pts { --bubble-color:rgba(251,191,36,0.22); }
+.bubble-reb .stat-bubble-val { color:var(--blue); }
+.bubble-reb { --bubble-color:rgba(96,165,250,0.22); }
+.bubble-ast .stat-bubble-val { color:var(--green); }
+.bubble-ast { --bubble-color:rgba(34,197,94,0.22); }
+.bubble-stl .stat-bubble-val { color:var(--purple); }
+.bubble-stl { --bubble-color:rgba(167,139,250,0.22); }
+.bubble-blk .stat-bubble-val { color:#fb7185; }
+.bubble-blk { --bubble-color:rgba(251,113,133,0.22); }
+.bubble-to .stat-bubble-val { color:var(--red); }
+.bubble-to { --bubble-color:rgba(244,63,94,0.22); }
+.bubble-foul .stat-bubble-val { color:var(--red); }
+.bubble-foul { --bubble-color:rgba(244,63,94,0.22); }
+.bubble-neutral .stat-bubble-val { color:var(--muted2); }
+
+/* SHOOTING CARDS */
+.shooting-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.shooting-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.shooting-card-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 14px;
+  background:linear-gradient(90deg, var(--sc-color,rgba(255,255,255,0.04)) 0%, transparent 100%);
+  border-bottom:1px solid var(--border);
+}
+.shooting-card-title { font-family:'Bebas Neue',sans-serif; font-size:18px; letter-spacing:2px; }
+.shooting-pct { font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; color:var(--muted2); }
+.shooting-tally { font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; text-align:center; padding:12px 6px 6px; letter-spacing:1px; }
+.tally-made { color:var(--green); }
+.sc-2pt .tally-made { color:var(--orange); }
+.sc-3pt .tally-made { color:var(--purple); }
+.sc-ft  .tally-made { color:var(--blue); }
+.tally-sep { color:var(--muted); font-size:20px; padding:0 2px; }
+.tally-att { color:var(--muted2); }
+
+/* SHOT BUTTONS — the core UX */
+.shot-btns-wrap { display:flex; flex-direction:column; }
+.shot-row { display:flex; border-top:1px solid var(--border); }
+.shot-btn {
+  flex:1; padding:10px 4px; border:none; cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
+  letter-spacing:0.5px; text-transform:uppercase; text-align:center;
+  transition:all 0.15s;
+  background:var(--surface2); color:var(--muted2);
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.shot-btn + .shot-btn { border-left:1px solid var(--border); }
+.shot-btn .sb-icon { font-size:16px; line-height:1; }
+.shot-btn .sb-lbl { font-size:9px; letter-spacing:0.8px; color:var(--muted); margin-top:1px; }
+.shot-btn.made:hover { background:var(--green-dim); color:var(--green); }
+.sc-2pt .shot-btn.made:hover { background:rgba(249,115,22,0.12); color:var(--orange); }
+.sc-3pt .shot-btn.made:hover { background:rgba(167,139,250,0.12); color:var(--purple); }
+.sc-ft  .shot-btn.made:hover { background:rgba(96,165,250,0.12); color:var(--blue); }
+.shot-btn.miss:hover { background:var(--red-dim); color:var(--red); }
+.shot-btn.undo-row { border-top:1px solid var(--border); }
+.shot-btn.undo-row:hover { background:rgba(148,163,184,0.08); color:var(--text); }
+
+/* Colour coding per card */
+.sc-2pt { --sc-color:rgba(249,115,22,0.12); }
+.sc-2pt .shooting-card-title { color:var(--orange); }
+.sc-3pt { --sc-color:rgba(167,139,250,0.12); }
+.sc-3pt .shooting-card-title { color:var(--purple); }
+.sc-ft  { --sc-color:rgba(96,165,250,0.12); }
+.sc-ft  .shooting-card-title { color:var(--blue); }
+
+/* FG TOTALS */
+.fg-totals {
+  background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 20px;
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:20px; text-align:center;
+}
+.fgt-label { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
+.fgt-val { font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; color:var(--muted2); }
+.fgt-val.hi { color:var(--text); }
+
+/* OTHER STATS */
+.other-stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+.other-btn {
+  padding:14px 8px; border-radius:8px; border:none; cursor:pointer;
+  background:var(--surface); border:1px solid var(--border);
+  font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+  letter-spacing:1px; text-align:center; text-transform:uppercase;
+  transition:all 0.16s; color:var(--muted2);
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+}
+.other-btn .ob-icon { font-size:22px; }
+.other-btn .ob-val { font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; }
+.other-btn .ob-lbl { font-size:9px; letter-spacing:1.5px; color:var(--muted); }
+.reb-btn:hover  { background:rgba(96,165,250,0.12); border-color:var(--blue); color:var(--blue); }
+.ast-btn:hover  { background:var(--green-dim); border-color:var(--green); color:var(--green); }
+.stl-btn:hover  { background:rgba(167,139,250,0.12); border-color:var(--purple); color:var(--purple); }
+.blk-btn:hover  { background:rgba(251,113,133,0.12); border-color:#fb7185; color:#fb7185; }
+.to-btn:hover   { background:var(--red-dim); border-color:var(--red); color:var(--red); }
+.foul-btn:hover { background:var(--red-dim); border-color:var(--red); color:var(--red); }
+
+.action-bar { display:flex; gap:10px; justify-content:flex-end; align-items:center; margin-top:4px; }
+.undo-global {
+  font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; color:var(--muted);
+  background:transparent; border:1px solid var(--border);
+  border-radius:5px; padding:8px 16px; cursor:pointer; transition:all 0.15s;
+}
+.undo-global:hover { color:var(--text); border-color:var(--border2); }
+
+/* SEASON */
+.season-controls { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+.toggle-pair { display:flex; }
+.toggle-opt {
+  padding:7px 16px; border:1px solid var(--border);
+  background:var(--surface2); color:var(--muted); cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  transition:all 0.15s;
+}
+.toggle-opt:first-child { border-radius:5px 0 0 5px; }
+.toggle-opt:last-child { border-radius:0 5px 5px 0; border-left:none; }
+.toggle-opt.on { background:var(--orange); color:#000; border-color:var(--orange); }
+.games-badge { margin-left:auto; font-size:13px; color:var(--muted); letter-spacing:1px; }
+.stats-table-wrap { overflow-x:auto; border-radius:8px; border:1px solid var(--border); }
+table { width:100%; border-collapse:collapse; min-width:600px; }
+thead { background:var(--surface2); }
+th {
+  padding:10px 12px; text-align:right;
+  font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted);
+  border-bottom:1px solid var(--border); white-space:nowrap;
+}
+th:first-child { text-align:left; }
+td {
+  padding:11px 12px; border-bottom:1px solid var(--border);
+  font-family:'IBM Plex Mono',monospace; font-size:14px; text-align:right; color:var(--muted2);
+}
+td:first-child { font-family:'Barlow Condensed',sans-serif; font-size:14px; text-align:left; color:var(--muted); }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(249,115,22,0.03); }
+td.hi { color:var(--text); }
+td.pts-col { color:var(--gold); }
+td.tot-row { color:var(--orange) !important; }
+
+/* GAME CARDS */
+.game-cards { display:flex; flex-direction:column; gap:10px; margin-top:20px; }
+.game-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:14px 18px;
+  display:grid; grid-template-columns:auto 1fr auto;
+  align-items:center; gap:16px; transition:border-color 0.15s;
+}
+.game-card:hover { border-color:var(--border2); }
+.game-card-date { font-size:12px; color:var(--muted); letter-spacing:1px; }
+.game-card-opp { font-size:16px; font-weight:700; }
+.result-badge {
+  font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:1px;
+  padding:3px 10px; border-radius:4px;
+}
+.w-badge { background:var(--green-dim); color:var(--green); border:1px solid rgba(34,197,94,0.3); }
+.l-badge { background:var(--red-dim); color:var(--red); border:1px solid rgba(244,63,94,0.3); }
+.t-badge { background:rgba(148,163,184,0.1); color:var(--muted2); border:1px solid var(--border); }
+.game-card-stats { display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; grid-column:1/-1; }
+.game-stat-pill { display:flex; align-items:center; gap:5px; }
+.gsp-label { color:var(--muted); font-size:10px; letter-spacing:1px; text-transform:uppercase; }
+.gsp-val { font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; color:var(--muted2); }
+
+/* RECEIPT */
+.receipt-layout { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.receipt-pre {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:20px; overflow-x:auto;
+}
+.receipt-pre pre {
+  font-family:'IBM Plex Mono',monospace; font-size:12px; line-height:1.8;
+  color:var(--text); white-space:pre;
+}
+.send-panel { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:22px; }
+.method-row { display:flex; gap:10px; margin-bottom:18px; }
+.method-pill {
+  flex:1; padding:11px 10px; border-radius:6px; border:1px solid var(--border);
+  background:var(--surface2); color:var(--muted); cursor:pointer; text-align:center;
+  font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:1.5px; transition:all 0.18s;
+}
+.method-pill.on { background:rgba(249,115,22,0.12); border-color:var(--orange); color:var(--orange); }
+.send-note { font-size:12px; color:var(--muted); line-height:1.5; margin-top:8px; }
+.status-msg { padding:12px 16px; border-radius:6px; font-size:14px; font-weight:600; margin-top:14px; display:none; }
+.status-msg.ok  { display:block; background:var(--green-dim); border:1px solid rgba(34,197,94,0.3); color:var(--green); }
+.status-msg.err { display:block; background:var(--red-dim); border:1px solid rgba(244,63,94,0.3); color:var(--red); }
+
+@media(max-width:640px){
+  .shooting-grid { grid-template-columns:1fr; }
+  .stat-panel { grid-template-columns:repeat(2,1fr); }
+  .other-stats-grid { grid-template-columns:repeat(2,1fr); }
+  .fg-totals { grid-template-columns:repeat(2,1fr); }
+  .receipt-layout { grid-template-columns:1fr; }
+  header { padding:0 14px; }
+  main { padding:14px; }
+  .nav-btn { padding:7px 10px; font-size:12px; }
+}
+
+/* iOS safe areas */
+header { padding-top: env(safe-area-inset-top); }
+main   { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+/* Sheets sync badge */
+.sync-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  padding:5px 12px; border-radius:20px; margin-top:10px;
+}
+.sync-badge.syncing { background:rgba(96,165,250,0.15); color:var(--blue); border:1px solid rgba(96,165,250,0.3); }
+.sync-badge.synced  { background:var(--green-dim); color:var(--green); border:1px solid rgba(34,197,94,0.3); }
+.sync-badge.sync-err{ background:var(--red-dim); color:var(--red); border:1px solid rgba(244,63,94,0.3); }
+.sync-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.sync-dot.pulse { animation:pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Settings view */
+.settings-section { margin-bottom:20px; }
+.settings-status {
+  padding:14px 18px; border-radius:8px; margin-top:14px;
+  font-size:14px; font-weight:600; display:none;
+}
+.settings-status.ok  { display:block; background:var(--green-dim); border:1px solid rgba(34,197,94,0.3); color:var(--green); }
+.settings-status.err { display:block; background:var(--red-dim); border:1px solid rgba(244,63,94,0.3); color:var(--red); }
+.settings-status.info{ display:block; background:rgba(96,165,250,0.12); border:1px solid rgba(96,165,250,0.3); color:var(--blue); }
+.sheet-preview {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:6px; padding:12px 16px; margin-top:12px;
+  font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted2);
+  line-height:1.7; display:none;
+}
+.danger-zone {
+  border:1px solid rgba(244,63,94,0.25); border-radius:8px;
+  padding:18px; margin-top:20px;
+}
+.danger-title { font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Court<em>Stat</em></div>
+  <nav class="nav">
+    <button class="nav-btn active" onclick="showView('setup',this)">Player</button>
+    <button class="nav-btn" onclick="showView('game',this)">Game</button>
+    <button class="nav-btn" onclick="showView('season',this)">Season</button>
+    <button class="nav-btn" onclick="showView('receipt',this)">Receipt</button>
+    <button class="nav-btn" onclick="showView('settings',this)">⚙</button>
+  </nav>
+</header>
+
+<!-- Bottom tab bar (mobile) -->
+<div class="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" onclick="showView('setup', this)" data-view="setup">
+      <span class="tab-icon">👤</span>
+      <span>Player</span>
+    </button>
+    <button class="tab-btn" onclick="showView('game', this)" data-view="game">
+      <span class="tab-icon">🏀</span>
+      <span>Game</span>
+    </button>
+    <button class="tab-btn" onclick="showView('season', this)" data-view="season">
+      <span class="tab-icon">📊</span>
+      <span>Season</span>
+    </button>
+    <button class="tab-btn" onclick="showView('receipt', this)" data-view="receipt">
+      <span class="tab-icon">📨</span>
+      <span>Receipt</span>
+    </button>
+    <button class="tab-btn" onclick="showView('settings', this)" data-view="settings">
+      <span class="tab-icon">⚙️</span>
+      <span>Settings</span>
+    </button>
+  </div>
+</div>
+
+<main>
+
+<!-- ═══ PLAYER SETUP ═══ -->
+<div id="view-setup" class="view active">
+  <div class="page-title">Player Setup</div>
+  <div class="page-sub">Enter your player's info once — track all season</div>
+
+  <div class="player-preview" id="playerPreview">
+    <div class="preview-num" id="previewNum">00</div>
+    <div class="preview-info">
+      <div class="name" id="previewName">PLAYER NAME</div>
+      <div class="meta" id="previewMeta">Position · Team</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Player Info</div>
+    <div class="field-row">
+      <div class="field" style="max-width:80px">
+        <label>#</label>
+        <input id="pNum" type="text" maxlength="3" placeholder="23" oninput="updatePreview()">
+      </div>
+      <div class="field">
+        <label>Player Name</label>
+        <input id="pName" type="text" placeholder="First Last" oninput="updatePreview()">
+      </div>
+      <div class="field" style="max-width:90px">
+        <label>Position</label>
+        <select id="pPos" onchange="updatePreview()">
+          <option>PG</option><option>SG</option><option selected>SF</option><option>PF</option><option>C</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Team Name</label>
+        <input id="pTeam" type="text" placeholder="e.g. Fontana Thunder" oninput="updatePreview()">
+      </div>
+      <div class="field">
+        <label>Season</label>
+        <input id="pSeason" type="text" placeholder="e.g. 2025 Spring" value="2025 Season">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="savePlayer()">Save &amp; Go to Game →</button>
+  </div>
+</div>
+
+<!-- ═══ LIVE GAME ═══ -->
+<div id="view-game" class="view">
+  <div class="page-title" id="gamePlayerName">—</div>
+  <div class="page-sub" id="gamePlayerMeta">Set up your player first</div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="field-row" style="margin-bottom:0; align-items:flex-end;">
+      <div class="field"><label>Opponent</label><input id="gOpp" type="text" placeholder="vs. Team Name"></div>
+      <div class="field" style="max-width:100px">
+        <label>Loc</label>
+        <select id="gLoc"><option value="H">Home</option><option value="A">Away</option></select>
+      </div>
+      <div class="field" style="max-width:150px"><label>Date</label><input id="gDate" type="date"></div>
+    </div>
+  </div>
+
+  <!-- Player pts live display -->
+  <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 22px;margin-bottom:20px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--gold);line-height:1" id="myScore">0</div>
+    <div style="font-size:12px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;line-height:1.6">
+      Player<br>Points
+    </div>
+    <div style="flex:1"></div>
+    <div style="text-align:right">
+      <div style="font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px" id="sbOppLabel"></div>
+      <div style="font-size:13px;color:var(--muted2);letter-spacing:1px" id="sbGameMeta">Enter opponent above to start</div>
+    </div>
+  </div>
+
+  <!-- Big stat bubbles -->
+  <div class="stat-panel">
+    <div class="stat-bubble bubble-pts"><div class="stat-bubble-label">PTS</div><div class="stat-bubble-val" id="bPts">0</div></div>
+    <div class="stat-bubble bubble-reb"><div class="stat-bubble-label">REB</div><div class="stat-bubble-val" id="bReb">0</div></div>
+    <div class="stat-bubble bubble-ast"><div class="stat-bubble-label">AST</div><div class="stat-bubble-val" id="bAst">0</div></div>
+    <div class="stat-bubble bubble-stl"><div class="stat-bubble-label">STL</div><div class="stat-bubble-val" id="bStl">0</div></div>
+    <div class="stat-bubble bubble-blk"><div class="stat-bubble-label">BLK</div><div class="stat-bubble-val" id="bBlk">0</div></div>
+    <div class="stat-bubble bubble-to" ><div class="stat-bubble-label">TO</div><div class="stat-bubble-val" id="bTo">0</div></div>
+    <div class="stat-bubble bubble-foul"><div class="stat-bubble-label">FOULS</div><div class="stat-bubble-val" id="bFoul">0</div></div>
+    <div class="stat-bubble bubble-neutral"><div class="stat-bubble-label">PTS</div><div class="stat-bubble-val" id="bPts2" style="color:var(--gold)">0</div></div>
+  </div>
+
+  <!-- ═══ SHOOTING CARDS — key UX ═══ -->
+  <!--
+    Logic enforced per card:
+      MADE  → made++ + att++ + pts += value
+      MISS  → att++ only (no made, no pts)
+      UNDO  → reverses last action on this card type
+  -->
+  <div class="shooting-grid">
+
+    <!-- 2-PT FG -->
+    <div class="shooting-card sc-2pt">
+      <div class="shooting-card-header">
+        <div class="shooting-card-title">2-Point FG</div>
+        <div class="shooting-pct" id="pct2">—%</div>
+      </div>
+      <div class="shooting-tally">
+        <span class="tally-made" id="t2m">0</span><span class="tally-sep">/</span><span class="tally-att" id="t2a">0</span>
+      </div>
+      <div class="shot-btns-wrap">
+        <div class="shot-row">
+          <button class="shot-btn made" onclick="shoot('2','make')">
+            <span class="sb-icon">🟠</span>
+            <span>+2 Made</span>
+            <span class="sb-lbl">+2 pts · FGM · FGA</span>
+          </button>
+          <button class="shot-btn miss" onclick="shoot('2','miss')">
+            <span class="sb-icon">✕</span>
+            <span>Miss</span>
+            <span class="sb-lbl">FGA only · no pts</span>
+          </button>
+        </div>
+        <button class="shot-btn undo-row" style="width:100%;border-radius:0 0 9px 9px" onclick="undoType('2')">
+          ↩ Undo Last 2PT
+        </button>
+      </div>
+    </div>
+
+    <!-- 3-PT FG -->
+    <div class="shooting-card sc-3pt">
+      <div class="shooting-card-header">
+        <div class="shooting-card-title">3-Point FG</div>
+        <div class="shooting-pct" id="pct3">—%</div>
+      </div>
+      <div class="shooting-tally">
+        <span class="tally-made" id="t3m">0</span><span class="tally-sep">/</span><span class="tally-att" id="t3a">0</span>
+      </div>
+      <div class="shot-btns-wrap">
+        <div class="shot-row">
+          <button class="shot-btn made" onclick="shoot('3','make')">
+            <span class="sb-icon">🟣</span>
+            <span>+3 Made</span>
+            <span class="sb-lbl">+3 pts · 3PM · 3PA</span>
+          </button>
+          <button class="shot-btn miss" onclick="shoot('3','miss')">
+            <span class="sb-icon">✕</span>
+            <span>Miss</span>
+            <span class="sb-lbl">3PA only · no pts</span>
+          </button>
+        </div>
+        <button class="shot-btn undo-row" style="width:100%;border-radius:0 0 9px 9px" onclick="undoType('3')">
+          ↩ Undo Last 3PT
+        </button>
+      </div>
+    </div>
+
+    <!-- FREE THROWS -->
+    <div class="shooting-card sc-ft">
+      <div class="shooting-card-header">
+        <div class="shooting-card-title">Free Throws</div>
+        <div class="shooting-pct" id="pctFt">—%</div>
+      </div>
+      <div class="shooting-tally">
+        <span class="tally-made" id="tFtm">0</span><span class="tally-sep">/</span><span class="tally-att" id="tFta">0</span>
+      </div>
+      <div class="shot-btns-wrap">
+        <div class="shot-row">
+          <button class="shot-btn made" onclick="shoot('ft','make')">
+            <span class="sb-icon">🔵</span>
+            <span>FT Made</span>
+            <span class="sb-lbl">+1 pt · FTM · FTA</span>
+          </button>
+          <button class="shot-btn miss" onclick="shoot('ft','miss')">
+            <span class="sb-icon">✕</span>
+            <span>Miss</span>
+            <span class="sb-lbl">FTA only · no pts</span>
+          </button>
+        </div>
+        <button class="shot-btn undo-row" style="width:100%;border-radius:0 0 9px 9px" onclick="undoType('ft')">
+          ↩ Undo Last FT
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /shooting-grid -->
+
+  <!-- FG TOTALS BAR -->
+  <div class="fg-totals">
+    <div>
+      <div class="fgt-label">Total FGM</div>
+      <div class="fgt-val hi" id="totFGM">0</div>
+    </div>
+    <div>
+      <div class="fgt-label">Total FGA</div>
+      <div class="fgt-val hi" id="totFGA">0</div>
+    </div>
+    <div>
+      <div class="fgt-label">FG%</div>
+      <div class="fgt-val hi" id="totFGPct">—%</div>
+    </div>
+    <div>
+      <div class="fgt-label">eFG% <span title="(FGM + 0.5×3PM) / FGA" style="cursor:help">ⓘ</span></div>
+      <div class="fgt-val" id="totEFG">—%</div>
+    </div>
+  </div>
+
+  <!-- OTHER STATS -->
+  <div class="other-stats-grid">
+    <button class="other-btn reb-btn"  onclick="addOther('reb')" >
+      <span class="ob-icon">💪</span><span class="ob-val" id="oReb">0</span><span class="ob-lbl">Rebound</span>
+    </button>
+    <button class="other-btn ast-btn"  onclick="addOther('ast')" >
+      <span class="ob-icon">🎯</span><span class="ob-val" id="oAst">0</span><span class="ob-lbl">Assist</span>
+    </button>
+    <button class="other-btn stl-btn"  onclick="addOther('stl')" >
+      <span class="ob-icon">⚡</span><span class="ob-val" id="oStl">0</span><span class="ob-lbl">Steal</span>
+    </button>
+    <button class="other-btn blk-btn"  onclick="addOther('blk')" >
+      <span class="ob-icon">🛡</span><span class="ob-val" id="oBlk">0</span><span class="ob-lbl">Block</span>
+    </button>
+    <button class="other-btn to-btn"   onclick="addOther('to')"  >
+      <span class="ob-icon">↩</span><span class="ob-val" id="oTo">0</span><span class="ob-lbl">Turnover</span>
+    </button>
+    <button class="other-btn foul-btn" onclick="addOther('foul')">
+      <span class="ob-icon">✋</span><span class="ob-val" id="oFoul">0</span><span class="ob-lbl">Foul</span>
+    </button>
+  </div>
+
+  <div class="action-bar">
+    <button class="undo-global" onclick="undoLast()">↩ Undo Last Action</button>
+    <button class="btn btn-ghost" onclick="resetGame()">Reset</button>
+    <button class="btn btn-primary" onclick="finalizeGame()">Finalize Game →</button>
+  </div>
+  <div id="syncIndicator" style="text-align:right;margin-top:8px;min-height:24px"></div>
+</div>
+
+<!-- ═══ SEASON ═══ -->
+<div id="view-season" class="view">
+  <div class="page-title" id="seasonTitle">2025 Season</div>
+  <div class="page-sub" id="seasonSub">Player stats across all games</div>
+
+  <div class="season-controls">
+    <div class="toggle-pair">
+      <button class="toggle-opt on" id="togTotals" onclick="setSeasonView('totals')">Totals</button>
+      <button class="toggle-opt"    id="togAvg"    onclick="setSeasonView('avg')">Per Game</button>
+    </div>
+    <div class="games-badge" id="gamesCount">0 games</div>
+  </div>
+
+  <div class="stats-table-wrap">
+    <table id="seasonTable">
+      <thead>
+        <tr>
+          <th>GAME</th>
+          <th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th>
+          <th>2FG</th><th>2FG%</th>
+          <th>3FG</th><th>3FG%</th>
+          <th>FG</th><th>FG%</th>
+          <th>FT</th><th>FT%</th>
+        </tr>
+      </thead>
+      <tbody id="seasonTbody"></tbody>
+    </table>
+  </div>
+
+  <div id="gameCardsSection"></div>
+</div>
+
+<!-- ═══ RECEIPT ═══ -->
+<div id="view-receipt" class="view">
+  <div class="page-title">Send Receipt</div>
+  <div class="page-sub">Share stats via email or text message</div>
+
+  <div style="display:flex;gap:12px;margin-bottom:16px">
+    <div class="field" style="max-width:220px">
+      <label>Report Type</label>
+      <select id="rcType" onchange="buildReceipt()">
+        <option value="game">Last Game</option>
+        <option value="season">Full Season</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="receipt-layout">
+    <div class="receipt-pre">
+      <div class="card-label" style="margin-bottom:12px">Preview</div>
+      <pre id="rcPreview">Finalize a game to generate a receipt.</pre>
+    </div>
+    <div class="send-panel">
+      <div class="card-label" style="margin-bottom:14px">Send Via</div>
+      <div class="method-row">
+        <div class="method-pill on" id="mp-email" onclick="setMethod('email')">✉ Email</div>
+        <div class="method-pill"    id="mp-sms"   onclick="setMethod('sms')">💬 Text</div>
+      </div>
+      <div id="emailFields">
+        <div class="field" style="margin-bottom:10px"><label>To Email</label><input id="toEmail" type="email" placeholder="email@example.com"></div>
+        <div class="field"><label>Subject</label><input id="rcSubject" type="text" value="Player Stats Receipt"></div>
+      </div>
+      <div id="smsFields" style="display:none">
+        <div class="field"><label>Phone Number</label><input id="toPhone" type="tel" placeholder="+1 (555) 000-0000"></div>
+        <p class="send-note">Full receipt is copied to clipboard. Your SMS app will open with a short summary — paste the clipboard content for the full stats.</p>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="sendReceipt()">Send</button>
+      <div id="rcStatus" class="status-msg"></div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ═══ SETTINGS ═══ -->
+<div id="view-settings" class="view">
+  <div class="page-title">Settings</div>
+  <div class="page-sub">Google Sheets sync &amp; data management</div>
+
+  <!-- Google Sheets -->
+  <div class="card settings-section">
+    <div class="card-label">Google Sheets Sync</div>
+    <p style="font-size:14px;color:var(--muted2);line-height:1.6;margin-bottom:16px">
+      Connected via Google Apps Script. Every finalized game is automatically written as a new row in your Google Sheet. Stats are also saved locally so the app works offline.
+    </p>
+    <div class="field-row">
+      <div class="field">
+        <label>Apps Script URL</label>
+        <input id="gsScriptUrl" type="text" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" style="font-size:12px">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field" style="max-width:200px">
+        <label>Sheet Tab Name</label>
+        <input id="gsTabName" type="text" placeholder="GameLogs" value="GameLogs">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveSheetSettings()">Save</button>
+      <button class="btn btn-ghost" onclick="testSheetConnection()">Test Connection</button>
+      <button class="btn btn-ghost" onclick="syncAllToSheet()">Sync All Games Now</button>
+    </div>
+    <div id="settingsStatus" class="settings-status"></div>
+    <div id="sheetPreview" class="sheet-preview"></div>
+  </div>
+
+  <!-- Sync status -->
+  <div class="card settings-section">
+    <div class="card-label">Sync Log</div>
+    <div id="syncLog" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted2);line-height:1.9">
+      No sync activity yet.
+    </div>
+  </div>
+
+  <!-- Danger zone -->
+  <div class="danger-zone">
+    <div class="danger-title">Danger Zone</div>
+    <p style="font-size:13px;color:var(--muted2);margin-bottom:14px;line-height:1.5">
+      Permanently deletes all local data — player info, game log, and credentials. Does not affect your Google Sheet.
+    </p>
+    <button class="btn" style="background:transparent;border:1px solid var(--red);color:var(--red);font-size:14px" onclick="clearAllData()">
+      Clear All Local Data
+    </button>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="finalizeModal">
+  <div class="modal-box">
+    <div class="modal-title">Finalize Game</div>
+    <div class="modal-sub" id="modalGameSub">Enter the final score</div>
+    <div class="modal-score-row">
+      <div class="modal-team">
+        <div class="modal-team-label" id="modalMyTeam">My Team</div>
+        <input class="modal-score-input" id="modalOurScore" type="number" min="0" value="0" oninput="updateModalResult()">
+      </div>
+      <div class="modal-vs">FINAL</div>
+      <div class="modal-team">
+        <div class="modal-team-label" id="modalOppTeam">Opponent</div>
+        <input class="modal-score-input" id="modalTheirScore" type="number" min="0" value="0" oninput="updateModalResult()">
+      </div>
+    </div>
+    <div class="modal-result-preview" id="modalResultPreview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmFinalize()">Save Game ✓</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  STORAGE KEYS
+// ════════════════════════════════════════
+const LS_PLAYER  = 'courtstat_player';
+const LS_GAMELOG = 'courtstat_gamelog';
+const LS_LIVE    = 'courtstat_live';    // in-progress game stats
+const LS_UNDO    = 'courtstat_undo';    // undo stack for live game
+
+// ════════════════════════════════════════
+//  PERSISTENCE HELPERS
+// ════════════════════════════════════════
+function saveAll() {
+  try {
+    localStorage.setItem(LS_PLAYER,  JSON.stringify(player));
+    localStorage.setItem(LS_GAMELOG, JSON.stringify(gameLog));
+    localStorage.setItem(LS_LIVE,    JSON.stringify(g));
+    localStorage.setItem(LS_UNDO,    JSON.stringify({ stack: undoStack, byType: undoByType }));
+    showSaveToast();
+  } catch(e) {
+    console.warn('localStorage save failed:', e);
+  }
+}
+
+function loadAll() {
+  try {
+    const sp = localStorage.getItem(LS_PLAYER);
+    if (sp) Object.assign(player, JSON.parse(sp));
+
+    const sg = localStorage.getItem(LS_GAMELOG);
+    if (sg) gameLog = JSON.parse(sg);
+
+    const sl = localStorage.getItem(LS_LIVE);
+    if (sl) g = JSON.parse(sl);
+
+    const su = localStorage.getItem(LS_UNDO);
+    if (su) {
+      const u = JSON.parse(su);
+      undoStack  = u.stack   || [];
+      undoByType = u.byType  || { '2':[], '3':[], ft:[], other:[] };
+    }
+  } catch(e) {
+    console.warn('localStorage load failed:', e);
+  }
+}
+
+function clearAllData() {
+  if (!confirm('⚠ This will permanently delete ALL local data — player info, game log, credentials, and in-progress stats. Your Google Sheet is NOT affected. Are you sure?')) return;
+  [LS_PLAYER, LS_GAMELOG, LS_LIVE, LS_UNDO, LS_SHEETS, LS_SYNCLOG, LS_SYNCED].forEach(k => localStorage.removeItem(k));
+  Object.assign(player, { num:'', name:'', pos:'PG', team:'', season:'2025 Season' });
+  Object.assign(sheetsConfig, { scriptUrl: DEFAULT_SCRIPT_URL, tabName: 'Sheet1' });
+  gameLog    = [];
+  syncLog    = [];
+  syncedIds  = new Set();
+  g          = freshStats();
+  undoStack  = [];
+  undoByType = { '2':[], '3':[], ft:[], other:[] };
+  ['pNum','pName','pTeam'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pPos').value    = 'PG';
+  document.getElementById('pSeason').value = '2025 Season';
+  updatePreview();
+  refreshAll();
+  populateSettingsFields();
+  showSaveToast('All data cleared');
+}
+
+// ── Save toast ──
+function showSaveToast(msg) {
+  let toast = document.getElementById('saveToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'saveToast';
+    toast.style.cssText = [
+      'position:fixed','bottom:24px','left:50%','transform:translateX(-50%) translateY(20px)',
+      'background:#1e2229','border:1px solid #22c55e','color:#22c55e',
+      'font-family:"Barlow Condensed",sans-serif','font-size:14px','font-weight:700',
+      'letter-spacing:1.5px','text-transform:uppercase',
+      'padding:10px 22px','border-radius:30px',
+      'opacity:0','transition:all 0.25s','z-index:9999','pointer-events:none',
+      'white-space:nowrap'
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg || '✓  Saved';
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 1800);
+}
+
+// ════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════
+const player = { num:'', name:'', pos:'SF', team:'', season:'2025 Season' };
+let gameLog = [];
+let sendMethod = 'email';
+let seasonView = 'totals';
+
+// Live game stats
+let g = freshStats();
+// Global undo stack — each entry knows how to reverse itself
+let undoStack = [];
+// Per-type stacks for the per-card undo buttons
+let undoByType = { '2':[], '3':[], ft:[], other:[] };
+
+function freshStats() {
+  return { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, foul:0,
+           fg2m:0, fg2a:0, fg3m:0, fg3a:0, ftm:0, fta:0 };
+}
+
+// Load persisted data immediately on script start
+loadAll();
+
+// Derived
+const fgm   = () => g.fg2m + g.fg3m;
+const fga   = () => g.fg2a + g.fg3a;
+const fgPct = () => fga()>0 ? (fgm()/fga()*100).toFixed(1)+'%' : '—%';
+const efgPct= () => fga()>0 ? ((fgm()+0.5*g.fg3m)/fga()*100).toFixed(1)+'%' : '—%';
+const p2Pct = () => g.fg2a>0 ? (g.fg2m/g.fg2a*100).toFixed(0)+'%' : '—%';
+const p3Pct = () => g.fg3a>0 ? (g.fg3m/g.fg3a*100).toFixed(0)+'%' : '—%';
+const ftPct = () => g.fta>0  ? (g.ftm/g.fta*100).toFixed(0)+'%'  : '—%';
+
+// ════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════
+document.getElementById('gDate').valueAsDate = new Date();
+
+function showView(name, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+
+  // Activate matching top nav btn (if triggered from top nav)
+  if (btn && btn.classList.contains('nav-btn')) btn.classList.add('active');
+  // Activate matching tab bar btn (if triggered from tab bar)
+  if (btn && btn.classList.contains('tab-btn')) btn.classList.add('active');
+  // Keep both in sync regardless of which triggered it
+  document.querySelectorAll(`.nav-btn, .tab-btn`).forEach(b => {
+    if (b.dataset.view === name || b.getAttribute('onclick')?.includes(`'${name}'`)) {
+      b.classList.add('active');
+    }
+  });
+
+  if (name==='game')     refreshAll();
+  if (name==='season')   renderSeason();
+  if (name==='receipt')  buildReceipt();
+  if (name==='settings') populateSettingsFields();
+}
+
+// ════════════════════════════════════════
+//  PLAYER SETUP
+// ════════════════════════════════════════
+function updatePreview() {
+  document.getElementById('previewNum').textContent  = document.getElementById('pNum').value   || '00';
+  document.getElementById('previewName').textContent = (document.getElementById('pName').value  || 'PLAYER NAME').toUpperCase();
+  document.getElementById('previewMeta').textContent =
+    (document.getElementById('pPos').value||'POS') + ' · ' + (document.getElementById('pTeam').value||'Team');
+}
+
+function savePlayer() {
+  player.num    = document.getElementById('pNum').value.trim()    || '00';
+  player.name   = document.getElementById('pName').value.trim()   || 'Player';
+  player.pos    = document.getElementById('pPos').value;
+  player.team   = document.getElementById('pTeam').value.trim()   || 'My Team';
+  player.season = document.getElementById('pSeason').value.trim() || '2025 Season';
+  saveAll();
+  document.querySelectorAll('.nav-btn')[1].click();
+}
+
+// init setup fields from loaded (or default) player data
+(function initSetup() {
+  document.getElementById('pNum').value    = player.num;
+  document.getElementById('pName').value   = player.name;
+  document.getElementById('pPos').value    = player.pos;
+  document.getElementById('pTeam').value   = player.team;
+  document.getElementById('pSeason').value = player.season;
+  updatePreview();
+})();
+
+// ════════════════════════════════════════
+//  GAME — SHOOTING LOGIC
+//  Rules:
+//    MADE  → madeCount++ · attCount++ · pts += value
+//    MISS  → attCount++ only (no made, no pts change)
+// ════════════════════════════════════════
+
+function shoot(type, result) {
+  let entry;
+  if (type === '2') {
+    if (result === 'make') {
+      g.fg2m++; g.fg2a++; g.pts += 2;
+      entry = { type:'2', result:'make' };
+      flashBubble('bPts');
+    } else {
+      g.fg2a++;
+      entry = { type:'2', result:'miss' };
+    }
+  } else if (type === '3') {
+    if (result === 'make') {
+      g.fg3m++; g.fg3a++; g.pts += 3;
+      entry = { type:'3', result:'make' };
+      flashBubble('bPts');
+    } else {
+      g.fg3a++;
+      entry = { type:'3', result:'miss' };
+    }
+  } else if (type === 'ft') {
+    if (result === 'make') {
+      g.ftm++; g.fta++; g.pts += 1;
+      entry = { type:'ft', result:'make' };
+      flashBubble('bPts');
+    } else {
+      g.fta++;
+      entry = { type:'ft', result:'miss' };
+    }
+  }
+  undoStack.push(entry);
+  undoByType[type].push(entry);
+  refreshAll();
+  saveAll();
+}
+
+function addOther(stat) {
+  g[stat]++;
+  const entry = { type:'other', stat };
+  undoStack.push(entry);
+  undoByType.other.push(entry);
+  const ids = { reb:'bReb', ast:'bAst', stl:'bStl', blk:'bBlk', to:'bTo', foul:'bFoul' };
+  if (ids[stat]) flashBubble(ids[stat]);
+  refreshAll();
+  saveAll();
+}
+
+// Reverse a single undo entry
+function reverseEntry(entry) {
+  if (!entry) return;
+  switch (entry.type) {
+    case '2':
+      if (entry.result==='make') { g.fg2m--; g.fg2a--; g.pts-=2; }
+      else { g.fg2a--; }
+      break;
+    case '3':
+      if (entry.result==='make') { g.fg3m--; g.fg3a--; g.pts-=3; }
+      else { g.fg3a--; }
+      break;
+    case 'ft':
+      if (entry.result==='make') { g.ftm--; g.fta--; g.pts-=1; }
+      else { g.fta--; }
+      break;
+    case 'other':
+      g[entry.stat]--;
+      break;
+  }
+  // clamp
+  Object.keys(g).forEach(k => { if (g[k]<0) g[k]=0; });
+}
+
+// Global undo — reverses the most recent action of any type
+function undoLast() {
+  if (!undoStack.length) return;
+  const entry = undoStack.pop();
+  // also remove from per-type stack
+  const stack = undoByType[entry.type];
+  const idx = stack.lastIndexOf(entry);
+  if (idx !== -1) stack.splice(idx, 1);
+  reverseEntry(entry);
+  refreshAll();
+  saveAll();
+}
+
+// Per-card undo — reverses only the last action for that shot type
+function undoType(type) {
+  const stack = undoByType[type];
+  if (!stack.length) return;
+  const entry = stack.pop();
+  // remove from global stack too
+  const idx = undoStack.lastIndexOf(entry);
+  if (idx !== -1) undoStack.splice(idx, 1);
+  reverseEntry(entry);
+  refreshAll();
+  saveAll();
+}
+
+function resetGame() {
+  if (!confirm('Reset all game stats?')) return;
+  g = freshStats();
+  undoStack = [];
+  undoByType = { '2':[], '3':[], ft:[], other:[] };
+  document.getElementById('gOpp').value = '';
+  document.getElementById('gDate').valueAsDate = new Date();
+  refreshAll();
+  saveAll();
+}
+
+// Opens the finalize modal — score is entered there, not tracked live
+function finalizeGame() {
+  const opp  = document.getElementById('gOpp').value.trim() || 'Opponent';
+  const team = player.team || 'My Team';
+  document.getElementById('modalMyTeam').textContent  = team;
+  document.getElementById('modalOppTeam').textContent = opp;
+  document.getElementById('modalGameSub').textContent =
+    `${team}  vs  ${opp}  ·  ${document.getElementById('gDate').value || 'Today'}`;
+  document.getElementById('modalOurScore').value   = '';
+  document.getElementById('modalTheirScore').value = '';
+  document.getElementById('modalResultPreview').textContent = '';
+  document.getElementById('finalizeModal').classList.add('open');
+  document.getElementById('modalOurScore').focus();
+}
+
+function updateModalResult() {
+  const ours   = parseInt(document.getElementById('modalOurScore').value)   || 0;
+  const theirs = parseInt(document.getElementById('modalTheirScore').value) || 0;
+  const el     = document.getElementById('modalResultPreview');
+  if (ours > theirs) {
+    el.style.color = 'var(--green)';
+    el.textContent = `WIN  ${ours}–${theirs}`;
+  } else if (theirs > ours) {
+    el.style.color = 'var(--red)';
+    el.textContent = `LOSS  ${ours}–${theirs}`;
+  } else if (ours === 0 && theirs === 0) {
+    el.textContent = '';
+  } else {
+    el.style.color = 'var(--muted2)';
+    el.textContent = `TIE  ${ours}–${theirs}`;
+  }
+}
+
+function closeModal() {
+  document.getElementById('finalizeModal').classList.remove('open');
+}
+
+function confirmFinalize() {
+  const opp        = document.getElementById('gOpp').value.trim() || 'Opponent';
+  const date       = document.getElementById('gDate').value;
+  const loc        = document.getElementById('gLoc').value;
+  const ourScore   = parseInt(document.getElementById('modalOurScore').value)   || 0;
+  const theirScore = parseInt(document.getElementById('modalTheirScore').value) || 0;
+
+  const newGame = {
+    id: Date.now().toString(), date, opp, loc, ourScore, theirScore,
+    result: ourScore > theirScore ? 'W' : ourScore < theirScore ? 'L' : 'T',
+    stats: { ...g }
+  };
+  gameLog.push(newGame);
+
+  closeModal();
+
+  // Reset for next game
+  g = freshStats();
+  undoStack = [];
+  undoByType = { '2':[], '3':[], ft:[], other:[] };
+  document.getElementById('gOpp').value = '';
+  document.getElementById('gDate').valueAsDate = new Date();
+  refreshAll();
+  saveAll();
+
+  // Fire-and-forget sync to Google Sheets
+  syncGameToSheet(newGame);
+}
+
+// ════════════════════════════════════════
+//  REFRESH ALL UI
+// ════════════════════════════════════════
+function refreshAll() {
+  // header
+  document.getElementById('gamePlayerName').textContent = player.name;
+  document.getElementById('gamePlayerMeta').textContent = `#${player.num} · ${player.pos} · ${player.team}`;
+
+  // live pts strip
+  document.getElementById('myScore').textContent = g.pts;
+  const opp = document.getElementById('gOpp').value.trim();
+  document.getElementById('sbOppLabel').textContent  = opp ? (document.getElementById('gLoc').value==='H' ? 'vs' : '@') + ' ' + opp : '';
+  document.getElementById('sbGameMeta').textContent  = opp
+    ? (document.getElementById('gDate').value || 'Today')
+    : 'Enter opponent above to start';
+
+  // bubbles
+  popSet('bPts',  g.pts);
+  popSet('bReb',  g.reb);
+  popSet('bAst',  g.ast);
+  popSet('bStl',  g.stl);
+  popSet('bBlk',  g.blk);
+  popSet('bTo',   g.to);
+  popSet('bFoul', g.foul);
+  set('bPts2', g.pts);
+
+  // other btns
+  set('oReb', g.reb); set('oAst', g.ast); set('oStl', g.stl);
+  set('oBlk', g.blk); set('oTo',  g.to);  set('oFoul',g.foul);
+
+  // shooting tallies
+  set('t2m', g.fg2m); set('t2a', g.fg2a);
+  set('t3m', g.fg3m); set('t3a', g.fg3a);
+  set('tFtm',g.ftm);  set('tFta',g.fta);
+
+  // pcts
+  set('pct2',  p2Pct());
+  set('pct3',  p3Pct());
+  set('pctFt', ftPct());
+
+  // FG totals
+  set('totFGM',   fgm());
+  set('totFGA',   fga());
+  set('totFGPct', fgPct());
+  set('totEFG',   efgPct());
+}
+
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function popSet(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val;
+  el.classList.remove('pop');
+  void el.offsetWidth;
+  el.classList.add('pop');
+  const bubble = el.closest('.stat-bubble');
+  if (bubble) {
+    bubble.classList.remove('flash');
+    void bubble.offsetWidth;
+    bubble.classList.add('flash');
+  }
+}
+
+function flashBubble(id) {
+  // called for pts explicitly; popSet handles it for others
+}
+
+// ════════════════════════════════════════
+//  SEASON VIEW
+// ════════════════════════════════════════
+function setSeasonView(v) {
+  seasonView = v;
+  document.getElementById('togTotals').classList.toggle('on', v==='totals');
+  document.getElementById('togAvg').classList.toggle('on',    v==='avg');
+  renderSeason();
+}
+
+function pctStr(m, a) {
+  return a>0 ? (m/a*100).toFixed(1)+'%' : '—%';
+}
+
+function renderSeason() {
+  document.getElementById('seasonTitle').textContent = player.season;
+  document.getElementById('seasonSub').textContent   = `${player.name} · #${player.num} · ${player.pos}`;
+  const gp = gameLog.length;
+  document.getElementById('gamesCount').textContent  = `${gp} game${gp!==1?'s':''}`;
+
+  const tbody = document.getElementById('seasonTbody');
+  if (!gp) {
+    tbody.innerHTML = `<tr><td colspan="15" style="text-align:center;padding:40px;color:var(--muted)">No games yet. Finalize a game first.</td></tr>`;
+    document.getElementById('gameCardsSection').innerHTML = '';
+    return;
+  }
+
+  const isAvg = seasonView==='avg';
+  const div   = isAvg ? gp : 1;
+
+  // Season totals
+  let tot = freshStats();
+  gameLog.forEach(gm => Object.keys(tot).forEach(k => tot[k] += gm.stats[k]));
+
+  const fmt = (n, dec=1) => isAvg ? (n/div).toFixed(dec) : String(n);
+  const fmtSplit = (m,a) => isAvg
+    ? `${(m/div).toFixed(1)}/${(a/div).toFixed(1)}`
+    : `${m}/${a}`;
+
+  // Per-game rows
+  let rows = gameLog.map((gm,i) => {
+    const s = gm.stats;
+    const fgm_g = s.fg2m+s.fg3m, fga_g = s.fg2a+s.fg3a;
+    return `<tr>
+      <td>${gm.date} <span style="color:var(--muted)">${gm.loc==='H'?'vs':'@'} ${gm.opp}</span></td>
+      <td class="pts-col">${s.pts}</td>
+      <td class="hi">${s.reb}</td>
+      <td class="hi">${s.ast}</td>
+      <td>${s.stl}</td>
+      <td>${s.blk}</td>
+      <td style="color:var(--red)">${s.to}</td>
+      <td>${s.fg2m}/${s.fg2a}</td>
+      <td>${pctStr(s.fg2m,s.fg2a)}</td>
+      <td>${s.fg3m}/${s.fg3a}</td>
+      <td>${pctStr(s.fg3m,s.fg3a)}</td>
+      <td>${fgm_g}/${fga_g}</td>
+      <td>${pctStr(fgm_g,fga_g)}</td>
+      <td>${s.ftm}/${s.fta}</td>
+      <td>${pctStr(s.ftm,s.fta)}</td>
+    </tr>`;
+  }).join('');
+
+  // Summary row
+  const tf = tot.fg2m+tot.fg3m, ta = tot.fg2a+tot.fg3a;
+  rows += `<tr>
+    <td class="tot-row">${isAvg?'PER GAME ('+gp+' GP)':'TOTALS ('+gp+' GP)'}</td>
+    <td class="pts-col">${fmt(tot.pts)}</td>
+    <td class="hi">${fmt(tot.reb)}</td>
+    <td class="hi">${fmt(tot.ast)}</td>
+    <td>${fmt(tot.stl)}</td>
+    <td>${fmt(tot.blk)}</td>
+    <td style="color:var(--red)">${fmt(tot.to)}</td>
+    <td>${fmtSplit(tot.fg2m,tot.fg2a)}</td>
+    <td>${pctStr(tot.fg2m,tot.fg2a)}</td>
+    <td>${fmtSplit(tot.fg3m,tot.fg3a)}</td>
+    <td>${pctStr(tot.fg3m,tot.fg3a)}</td>
+    <td>${fmtSplit(tf,ta)}</td>
+    <td>${pctStr(tf,ta)}</td>
+    <td>${fmtSplit(tot.ftm,tot.fta)}</td>
+    <td>${pctStr(tot.ftm,tot.fta)}</td>
+  </tr>`;
+
+  tbody.innerHTML = rows;
+
+  // Game log cards
+  document.getElementById('gameCardsSection').innerHTML = `
+    <div style="margin-top:28px">
+      <div class="card-label">Game Log</div>
+      <div class="game-cards">
+        ${[...gameLog].reverse().map(gm => {
+          const s = gm.stats;
+          const fgm_g = s.fg2m+s.fg3m, fga_g = s.fg2a+s.fg3a;
+          return `<div class="game-card">
+            <div>
+              <div class="game-card-date">${gm.date}</div>
+              <div class="game-card-opp">${gm.loc==='H'?'vs':'@'} ${gm.opp}</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:var(--muted2)">${gm.ourScore}–${gm.theirScore}</div>
+            <span class="result-badge ${gm.result==='W'?'w-badge':gm.result==='L'?'l-badge':'t-badge'}">${gm.result}</span>
+            <div class="game-card-stats">
+              <div class="game-stat-pill"><span class="gsp-label">PTS</span><span class="gsp-val" style="color:var(--gold)">${s.pts}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">REB</span><span class="gsp-val">${s.reb}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">AST</span><span class="gsp-val">${s.ast}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">2FG</span><span class="gsp-val">${s.fg2m}/${s.fg2a}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">3FG</span><span class="gsp-val">${s.fg3m}/${s.fg3a}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">FT</span><span class="gsp-val">${s.ftm}/${s.fta}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">STL</span><span class="gsp-val">${s.stl}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">BLK</span><span class="gsp-val">${s.blk}</span></div>
+              <div class="game-stat-pill"><span class="gsp-label">TO</span><span class="gsp-val" style="color:var(--red)">${s.to}</span></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+// ════════════════════════════════════════
+//  RECEIPT
+// ════════════════════════════════════════
+function setMethod(m) {
+  sendMethod = m;
+  document.getElementById('mp-email').classList.toggle('on', m==='email');
+  document.getElementById('mp-sms').classList.toggle('on',   m==='sms');
+  document.getElementById('emailFields').style.display = m==='email'?'block':'none';
+  document.getElementById('smsFields').style.display   = m==='sms'?'block':'none';
+}
+
+function buildReceipt() {
+  const type = document.getElementById('rcType').value;
+  const L  = s => (s||'') + '\n';
+  const HR = () => '─'.repeat(46) + '\n';
+  let txt = '';
+
+  txt += L(`┌──────────────────────────────────────────────┐`);
+  txt += L(`│       COURTSTAT  ·  PLAYER STATS RECEIPT      │`);
+  txt += L(`└──────────────────────────────────────────────┘`);
+  txt += L(`Player : ${player.name}  #${player.num}  ${player.pos}`);
+  txt += L(`Team   : ${player.team}`);
+  txt += L(`Season : ${player.season}`);
+  txt += HR();
+
+  if (type === 'game') {
+    const gm = gameLog[gameLog.length-1];
+    if (!gm) { document.getElementById('rcPreview').textContent = 'No games finalized yet.'; return; }
+    const s = gm.stats;
+    const fgm_g = s.fg2m+s.fg3m, fga_g = s.fg2a+s.fg3a;
+    txt += L(`GAME     : ${gm.loc==='H'?'vs':'@'} ${gm.opp}`);
+    txt += L(`DATE     : ${gm.date}   RESULT : ${gm.ourScore}–${gm.theirScore} (${gm.result})`);
+    txt += HR();
+    txt += L(`SCORING`);
+    txt += L(`  Points          :  ${s.pts}`);
+    txt += HR();
+    txt += L(`SHOOTING`);
+    txt += L(`  2-Pt FG Made    :  ${s.fg2m}  /  ${s.fg2a} att  (${pctStr(s.fg2m,s.fg2a)})`);
+    txt += L(`  3-Pt FG Made    :  ${s.fg3m}  /  ${s.fg3a} att  (${pctStr(s.fg3m,s.fg3a)})`);
+    txt += L(`  Total FG        :  ${fgm_g}  /  ${fga_g} att  (${pctStr(fgm_g,fga_g)})`);
+    txt += L(`  Free Throws     :  ${s.ftm}  /  ${s.fta} att  (${pctStr(s.ftm,s.fta)})`);
+    txt += HR();
+    txt += L(`OTHER STATS`);
+    txt += L(`  Rebounds        :  ${s.reb}`);
+    txt += L(`  Assists         :  ${s.ast}`);
+    txt += L(`  Steals          :  ${s.stl}`);
+    txt += L(`  Blocks          :  ${s.blk}`);
+    txt += L(`  Turnovers       :  ${s.to}`);
+    txt += L(`  Fouls           :  ${s.foul}`);
+  } else {
+    const gp = gameLog.length;
+    if (!gp) { document.getElementById('rcPreview').textContent = 'No games finalized yet.'; return; }
+    let tot = freshStats();
+    gameLog.forEach(gm => Object.keys(tot).forEach(k => tot[k]+=gm.stats[k]));
+    const tf = tot.fg2m+tot.fg3m, ta = tot.fg2a+tot.fg3a;
+    const a = k => (tot[k]/gp).toFixed(1);
+    txt += L(`SEASON TOTALS  (${gp} games played)`);
+    txt += HR();
+    txt += L(`SCORING`);
+    txt += L(`  Total Points    :  ${tot.pts}  (${a('pts')} ppg)`);
+    txt += HR();
+    txt += L(`SHOOTING`);
+    txt += L(`  2-Pt FG        :  ${tot.fg2m} / ${tot.fg2a}  (${pctStr(tot.fg2m,tot.fg2a)})  avg ${(tot.fg2m/gp).toFixed(1)}/${(tot.fg2a/gp).toFixed(1)}`);
+    txt += L(`  3-Pt FG        :  ${tot.fg3m} / ${tot.fg3a}  (${pctStr(tot.fg3m,tot.fg3a)})  avg ${(tot.fg3m/gp).toFixed(1)}/${(tot.fg3a/gp).toFixed(1)}`);
+    txt += L(`  Total FG       :  ${tf} / ${ta}  (${pctStr(tf,ta)})  avg ${(tf/gp).toFixed(1)}/${(ta/gp).toFixed(1)}`);
+    txt += L(`  Free Throws    :  ${tot.ftm} / ${tot.fta}  (${pctStr(tot.ftm,tot.fta)})  avg ${(tot.ftm/gp).toFixed(1)}/${(tot.fta/gp).toFixed(1)}`);
+    txt += HR();
+    txt += L(`OTHER STATS`);
+    txt += L(`  Rebounds       :  ${tot.reb}  (${a('reb')} rpg)`);
+    txt += L(`  Assists        :  ${tot.ast}  (${a('ast')} apg)`);
+    txt += L(`  Steals         :  ${tot.stl}  (${a('stl')} spg)`);
+    txt += L(`  Blocks         :  ${tot.blk}  (${a('blk')} bpg)`);
+    txt += L(`  Turnovers      :  ${tot.to}   (${a('to')} tpg)`);
+    txt += L(`  Fouls          :  ${tot.foul}`);
+    txt += HR();
+    txt += L(`GAME LOG`);
+    gameLog.forEach(gm => {
+      const s = gm.stats;
+      txt += L(`  ${gm.date}  ${(gm.loc==='H'?'vs ':'@ ')+gm.opp.padEnd(16)}  ${String(gm.ourScore).padStart(2)}-${gm.theirScore} (${gm.result})  ${s.pts}pts ${s.reb}reb ${s.ast}ast`);
+    });
+  }
+
+  txt += HR();
+  txt += L(`Generated by CourtStat  ·  ${new Date().toLocaleDateString()}`);
+
+  document.getElementById('rcPreview').textContent = txt;
+  if (document.getElementById('rcSubject')) {
+    const gm = gameLog[gameLog.length-1];
+    document.getElementById('rcSubject').value = type==='game' && gm
+      ? `Stats: ${player.name} vs ${gm.opp} (${gm.date})`
+      : `Season Stats: ${player.name} — ${player.season}`;
+  }
+  return txt;
+}
+
+function sendReceipt() {
+  const txt = buildReceipt();
+  const statusEl = document.getElementById('rcStatus');
+  statusEl.className = 'status-msg';
+
+  if (sendMethod==='email') {
+    const email = document.getElementById('toEmail').value.trim();
+    const subj  = document.getElementById('rcSubject').value.trim();
+    if (!email) { statusEl.textContent='⚠ Enter an email address.'; statusEl.className='status-msg err'; return; }
+    window.open(`mailto:${email}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(txt)}`, '_blank');
+    statusEl.textContent='✓ Email client opened with the receipt pre-filled.';
+    statusEl.className='status-msg ok';
+  } else {
+    const phone = document.getElementById('toPhone').value.trim();
+    const short = `${player.name} stats: ${gameLog.length ? gameLog[gameLog.length-1].stats.pts+'pts' : '—'} · See full receipt.`;
+    navigator.clipboard.writeText(txt).then(() => {
+      if (phone) window.open(`sms:${phone.replace(/\D/g,'')}?body=${encodeURIComponent(short)}`, '_blank');
+      statusEl.textContent = phone
+        ? '✓ SMS app opened. Full receipt copied to clipboard — paste to send.'
+        : '✓ Full receipt copied to clipboard.';
+      statusEl.className='status-msg ok';
+    }).catch(() => {
+      statusEl.textContent='⚠ Clipboard access denied. Copy the preview manually.';
+      statusEl.className='status-msg err';
+    });
+  }
+}
+
+// ════════════════════════════════════════
+//  GOOGLE SHEETS — APPS SCRIPT INTEGRATION
+//  Writes via a deployed Google Apps Script
+//  web endpoint. No OAuth, no API key needed.
+// ════════════════════════════════════════
+const LS_SHEETS   = 'courtstat_sheets';
+const LS_SYNCLOG  = 'courtstat_synclog';
+const LS_SYNCED   = 'courtstat_synced';
+
+// Default to the deployed script URL — user can override in Settings
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzfSovN5JD2FIzy0ZnuKHH_fL63p9cPCojh0T28jkpqhtyKltygoWR_x5anME7VRc8WyQ/exec';
+
+let sheetsConfig = { scriptUrl: DEFAULT_SCRIPT_URL, tabName: 'GameLogs' };
+let syncLog      = [];
+let syncedIds    = new Set();
+
+function loadSheetsConfig() {
+  try {
+    const s = localStorage.getItem(LS_SHEETS);
+    if (s) sheetsConfig = { ...sheetsConfig, ...JSON.parse(s) };
+    const l = localStorage.getItem(LS_SYNCLOG);
+    if (l) syncLog = JSON.parse(l);
+    const i = localStorage.getItem(LS_SYNCED);
+    if (i) syncedIds = new Set(JSON.parse(i));
+  } catch(e) {}
+}
+
+function saveSheetsConfig() {
+  localStorage.setItem(LS_SHEETS,  JSON.stringify(sheetsConfig));
+  localStorage.setItem(LS_SYNCLOG, JSON.stringify(syncLog.slice(-50)));
+  localStorage.setItem(LS_SYNCED,  JSON.stringify([...syncedIds]));
+}
+
+// Build the row array sent to the Apps Script
+function gameToRow(gm) {
+  const s   = gm.stats;
+  const pct = (m,a) => a>0 ? parseFloat((m/a*100).toFixed(1)) : 0;
+  const fgm = s.fg2m + s.fg3m;
+  const fga = s.fg2a + s.fg3a;
+  return [
+    gm.date,
+    gm.opp,
+    gm.loc === 'H' ? 'Home' : 'Away',
+    gm.result,
+    gm.ourScore,
+    gm.theirScore,
+    s.pts, s.reb, s.ast, s.stl, s.blk, s.to, s.foul,
+    s.fg2m, s.fg2a, pct(s.fg2m, s.fg2a),
+    s.fg3m, s.fg3a, pct(s.fg3m, s.fg3a),
+    fgm,   fga,   pct(fgm, fga),
+    s.ftm, s.fta, pct(s.ftm, s.fta)
+  ];
+}
+
+// POST a single row to the Apps Script endpoint
+// Uses GET with data as a URL parameter — avoids all CORS and Safari
+// network blocking issues that affect cross-origin POST requests
+async function postToScript(row) {
+  const url = sheetsConfig.scriptUrl || DEFAULT_SCRIPT_URL;
+  if (!url) throw new Error('No script URL configured. Go to Settings.');
+
+  const payload = JSON.stringify({
+    tab: sheetsConfig.tabName || 'GameLogs',
+    row
+  });
+
+  const fullUrl = `${url}?data=${encodeURIComponent(payload)}`;
+  const res = await fetch(fullUrl, { method: 'GET' });
+  const text = await res.text();
+
+  let json;
+  try { json = JSON.parse(text); } catch(e) { throw new Error('Invalid response from script'); }
+  if (json.status !== 'ok') throw new Error(json.message || 'Script returned an error');
+  return json;
+}
+
+// Test connection using a simple GET ping
+async function pingScript() {
+  const url = sheetsConfig.scriptUrl || DEFAULT_SCRIPT_URL;
+  const res  = await fetch(`${url}?ping=1`);
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch(e) { throw new Error('Invalid response'); }
+  if (json.status !== 'ok') throw new Error(json.message || 'Script error');
+  return json;
+}
+
+function addSyncLog(msg, type='info') {
+  const ts   = new Date().toLocaleTimeString();
+  const icon = type==='ok' ? '✓' : type==='err' ? '✗' : '→';
+  syncLog.push(`${icon} ${ts}  ${msg}`);
+  saveSheetsConfig();
+  renderSyncLog();
+}
+
+function renderSyncLog() {
+  const el = document.getElementById('syncLog');
+  if (!el) return;
+  el.innerHTML = syncLog.length
+    ? [...syncLog].reverse().slice(0,20).map(l => `<div>${l}</div>`).join('')
+    : 'No sync activity yet.';
+}
+
+function setSyncIndicator(msg, type) {
+  const el = document.getElementById('syncIndicator');
+  if (!el) return;
+  const colors = { syncing:'var(--blue)', ok:'var(--green)', err:'var(--red)', '':'var(--muted)' };
+  el.innerHTML = msg
+    ? `<span style="font-size:12px;color:${colors[type]||colors['']};letter-spacing:1px">${msg}</span>`
+    : '';
+}
+
+// Auto-sync after every finalized game
+async function syncGameToSheet(gm) {
+  if (!sheetsConfig.scriptUrl) return;
+  if (syncedIds.has(gm.id)) return;
+
+  setSyncIndicator('⟳ Syncing to Google Sheets…', 'syncing');
+  addSyncLog(`Syncing: ${gm.opp} (${gm.date})…`);
+
+  try {
+    await postToScript(gameToRow(gm));
+    syncedIds.add(gm.id);
+    saveSheetsConfig();
+    setSyncIndicator('✓ Synced to Google Sheets', 'ok');
+    addSyncLog(`✓ Saved: ${gm.opp} ${gm.ourScore}–${gm.theirScore} (${gm.result}) — ${gm.stats.pts} pts`, 'ok');
+    setTimeout(() => setSyncIndicator('', ''), 4000);
+  } catch(e) {
+    setSyncIndicator('⚠ Sheets sync failed — saved locally', 'err');
+    addSyncLog(`✗ Error: ${e.message}`, 'err');
+    setTimeout(() => setSyncIndicator('', ''), 6000);
+  }
+}
+
+// Sync all unsynced games (called from Settings)
+async function syncAllToSheet() {
+  const unsynced = gameLog.filter(gm => !syncedIds.has(gm.id));
+  const statusEl = document.getElementById('settingsStatus');
+
+  if (!unsynced.length) {
+    statusEl.textContent = '✓ All games are already synced.';
+    statusEl.className = 'settings-status ok';
+    return;
+  }
+
+  statusEl.textContent = `⟳ Syncing ${unsynced.length} game(s)…`;
+  statusEl.className = 'settings-status info';
+
+  let ok = 0, fail = 0;
+  for (const gm of unsynced) {
+    try {
+      await postToScript(gameToRow(gm));
+      syncedIds.add(gm.id);
+      ok++;
+      addSyncLog(`✓ Synced: ${gm.opp} (${gm.date})`, 'ok');
+    } catch(e) {
+      fail++;
+      addSyncLog(`✗ Failed: ${gm.opp} — ${e.message}`, 'err');
+    }
+  }
+  saveSheetsConfig();
+
+  if (fail === 0) {
+    statusEl.textContent = `✓ Synced ${ok} game(s) successfully.`;
+    statusEl.className = 'settings-status ok';
+  } else {
+    statusEl.textContent = `⚠ ${ok} synced, ${fail} failed. Check sync log below.`;
+    statusEl.className = 'settings-status err';
+  }
+}
+
+// ════════════════════════════════════════
+//  SETTINGS UI
+// ════════════════════════════════════════
+function saveSheetSettings() {
+  const urlInput = document.getElementById('gsScriptUrl');
+  const tabInput = document.getElementById('gsTabName');
+  sheetsConfig.scriptUrl = (urlInput?.value.trim()) || DEFAULT_SCRIPT_URL;
+  sheetsConfig.tabName   = (tabInput?.value.trim()) || 'GameLogs';
+  saveSheetsConfig();
+  const statusEl = document.getElementById('settingsStatus');
+  statusEl.textContent = '✓ Settings saved to this device.';
+  statusEl.className = 'settings-status ok';
+  showSaveToast('Settings saved');
+}
+
+async function testSheetConnection() {
+  const statusEl = document.getElementById('settingsStatus');
+  const preview  = document.getElementById('sheetPreview');
+
+  // Read current field values before testing
+  const urlInput = document.getElementById('gsScriptUrl');
+  const tabInput = document.getElementById('gsTabName');
+  if (urlInput?.value.trim()) sheetsConfig.scriptUrl = urlInput.value.trim();
+  if (tabInput?.value.trim()) sheetsConfig.tabName   = tabInput.value.trim();
+
+  statusEl.textContent = '⟳ Testing connection…';
+  statusEl.className = 'settings-status info';
+  preview.style.display = 'none';
+
+  try {
+    const res = await pingScript();
+    const rows = res.rows ?? '—';
+    statusEl.textContent = `✓ Connected! Sheet has ${rows} row(s). Ready to sync.`;
+    statusEl.className = 'settings-status ok';
+    preview.style.display = 'block';
+    preview.textContent =
+      `Script URL : ${sheetsConfig.scriptUrl}\nTab        : ${sheetsConfig.tabName}\nRows       : ${rows}`;
+    addSyncLog('Connection test passed', 'ok');
+  } catch(e) {
+    statusEl.textContent = `✗ Connection failed: ${e.message}`;
+    statusEl.className = 'settings-status err';
+    addSyncLog(`Connection test failed: ${e.message}`, 'err');
+  }
+}
+
+function populateSettingsFields() {
+  const u = document.getElementById('gsScriptUrl');
+  const t = document.getElementById('gsTabName');
+  if (u) u.value = sheetsConfig.scriptUrl || DEFAULT_SCRIPT_URL;
+  if (t) t.value = sheetsConfig.tabName   || 'Sheet1';
+  renderSyncLog();
+}
+
+// ════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION
+// ════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/courtstat/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// ════════════════════════════════════════
+//  BOOT
+// ════════════════════════════════════════
+loadSheetsConfig();
+
+// Close modal on overlay background click
+document.getElementById('finalizeModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Boot: if player data already exists, go straight to Game tab
+if (player.name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-game').classList.add('active');
+  // activate Game in both navs
+  document.querySelectorAll('.nav-btn, .tab-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.dataset.view === 'game' || b.getAttribute('onclick')?.includes("'game'")) {
+      b.classList.add('active');
+    }
+  });
+}
+
+// Initial render
+refreshAll();
+</script>
+</body>
+</html>
