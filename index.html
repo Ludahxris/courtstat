@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CourtStat — Player Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CourtStat</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CourtStat">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#f97316">
+
+<!-- Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -363,6 +373,44 @@ td.tot-row { color:var(--orange) !important; }
   main { padding:14px; }
   .nav-btn { padding:7px 10px; font-size:12px; }
 }
+
+/* iOS safe areas */
+header { padding-top: env(safe-area-inset-top); }
+main   { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+/* Sheets sync badge */
+.sync-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  padding:5px 12px; border-radius:20px; margin-top:10px;
+}
+.sync-badge.syncing { background:rgba(96,165,250,0.15); color:var(--blue); border:1px solid rgba(96,165,250,0.3); }
+.sync-badge.synced  { background:var(--green-dim); color:var(--green); border:1px solid rgba(34,197,94,0.3); }
+.sync-badge.sync-err{ background:var(--red-dim); color:var(--red); border:1px solid rgba(244,63,94,0.3); }
+.sync-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.sync-dot.pulse { animation:pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Settings view */
+.settings-section { margin-bottom:20px; }
+.settings-status {
+  padding:14px 18px; border-radius:8px; margin-top:14px;
+  font-size:14px; font-weight:600; display:none;
+}
+.settings-status.ok  { display:block; background:var(--green-dim); border:1px solid rgba(34,197,94,0.3); color:var(--green); }
+.settings-status.err { display:block; background:var(--red-dim); border:1px solid rgba(244,63,94,0.3); color:var(--red); }
+.settings-status.info{ display:block; background:rgba(96,165,250,0.12); border:1px solid rgba(96,165,250,0.3); color:var(--blue); }
+.sheet-preview {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:6px; padding:12px 16px; margin-top:12px;
+  font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted2);
+  line-height:1.7; display:none;
+}
+.danger-zone {
+  border:1px solid rgba(244,63,94,0.25); border-radius:8px;
+  padding:18px; margin-top:20px;
+}
+.danger-title { font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
 </style>
 </head>
 <body>
@@ -374,6 +422,7 @@ td.tot-row { color:var(--orange) !important; }
     <button class="nav-btn" onclick="showView('game',this)">Game</button>
     <button class="nav-btn" onclick="showView('season',this)">Season</button>
     <button class="nav-btn" onclick="showView('receipt',this)">Receipt</button>
+    <button class="nav-btn" onclick="showView('settings',this)">⚙</button>
   </nav>
 </header>
 
@@ -421,9 +470,6 @@ td.tot-row { color:var(--orange) !important; }
       </div>
     </div>
     <button class="btn btn-primary" onclick="savePlayer()">Save &amp; Go to Game →</button>
-    <button onclick="clearAllData()" style="margin-top:12px;background:transparent;border:none;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1px;cursor:pointer;text-decoration:underline;display:block;">
-      Clear all saved data
-    </button>
   </div>
 </div>
 
@@ -610,6 +656,7 @@ td.tot-row { color:var(--orange) !important; }
     <button class="btn btn-ghost" onclick="resetGame()">Reset</button>
     <button class="btn btn-primary" onclick="finalizeGame()">Finalize Game →</button>
   </div>
+  <div id="syncIndicator" style="text-align:right;margin-top:8px;min-height:24px"></div>
 </div>
 
 <!-- ═══ SEASON ═══ -->
@@ -686,7 +733,66 @@ td.tot-row { color:var(--orange) !important; }
 
 </main>
 
-<!-- ═══ FINALIZE MODAL ═══ -->
+<!-- ═══ SETTINGS ═══ -->
+<div id="view-settings" class="view">
+  <div class="page-title">Settings</div>
+  <div class="page-sub">Google Sheets sync &amp; data management</div>
+
+  <!-- Google Sheets -->
+  <div class="card settings-section">
+    <div class="card-label">Google Sheets Sync</div>
+    <p style="font-size:14px;color:var(--muted2);line-height:1.6;margin-bottom:16px">
+      When configured, every finalized game is automatically written as a new row in your Google Sheet.
+      Stats are also saved locally so the app works offline.
+    </p>
+    <div class="field-row">
+      <div class="field">
+        <label>API Key</label>
+        <input id="gsApiKey" type="password" placeholder="Paste your Google API key" autocomplete="off">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Sheet ID</label>
+        <input id="gsSheetId" type="text" placeholder="Paste your Google Sheet ID" autocomplete="off">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field" style="max-width:200px">
+        <label>Sheet Tab Name</label>
+        <input id="gsTabName" type="text" placeholder="Sheet1" value="Sheet1">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveSheetSettings()">Save Credentials</button>
+      <button class="btn btn-ghost" onclick="testSheetConnection()">Test Connection</button>
+      <button class="btn btn-ghost" onclick="syncAllToSheet()">Sync All Games Now</button>
+    </div>
+    <div id="settingsStatus" class="settings-status"></div>
+    <div id="sheetPreview" class="sheet-preview"></div>
+  </div>
+
+  <!-- Sync status -->
+  <div class="card settings-section">
+    <div class="card-label">Sync Log</div>
+    <div id="syncLog" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted2);line-height:1.9">
+      No sync activity yet.
+    </div>
+  </div>
+
+  <!-- Danger zone -->
+  <div class="danger-zone">
+    <div class="danger-title">Danger Zone</div>
+    <p style="font-size:13px;color:var(--muted2);margin-bottom:14px;line-height:1.5">
+      Permanently deletes all local data — player info, game log, and credentials. Does not affect your Google Sheet.
+    </p>
+    <button class="btn" style="background:transparent;border:1px solid var(--red);color:var(--red);font-size:14px" onclick="clearAllData()">
+      Clear All Local Data
+    </button>
+  </div>
+</div>
+
+
 <div class="modal-overlay" id="finalizeModal">
   <div class="modal-box">
     <div class="modal-title">Finalize Game</div>
@@ -757,20 +863,23 @@ function loadAll() {
 }
 
 function clearAllData() {
-  if (!confirm('⚠ This will permanently delete ALL player info, game log, and in-progress stats. Are you sure?')) return;
-  [LS_PLAYER, LS_GAMELOG, LS_LIVE, LS_UNDO].forEach(k => localStorage.removeItem(k));
+  if (!confirm('⚠ This will permanently delete ALL local data — player info, game log, credentials, and in-progress stats. Your Google Sheet is NOT affected. Are you sure?')) return;
+  [LS_PLAYER, LS_GAMELOG, LS_LIVE, LS_UNDO, LS_SHEETS, LS_SYNCLOG, LS_SYNCED].forEach(k => localStorage.removeItem(k));
   Object.assign(player, { num:'', name:'', pos:'PG', team:'', season:'2025 Season' });
+  Object.assign(sheetsConfig, { apiKey:'', sheetId:'', tabName:'Sheet1' });
   gameLog    = [];
+  syncLog    = [];
+  syncedIds  = new Set();
   g          = freshStats();
   undoStack  = [];
   undoByType = { '2':[], '3':[], ft:[], other:[] };
-  // reset setup form
   ['pNum','pName','pTeam'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('pPos').value    = 'PG';
   document.getElementById('pSeason').value = '2025 Season';
   updatePreview();
   refreshAll();
-  showSaveToast('Data cleared');
+  populateSettingsFields();
+  showSaveToast('All data cleared');
 }
 
 // ── Save toast ──
@@ -842,9 +951,10 @@ function showView(name, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name==='game')    refreshAll();
-  if (name==='season')  renderSeason();
-  if (name==='receipt') buildReceipt();
+  if (name==='game')     refreshAll();
+  if (name==='season')   renderSeason();
+  if (name==='receipt')  buildReceipt();
+  if (name==='settings') populateSettingsFields();
 }
 
 // ════════════════════════════════════════
@@ -1036,11 +1146,12 @@ function confirmFinalize() {
   const ourScore   = parseInt(document.getElementById('modalOurScore').value)   || 0;
   const theirScore = parseInt(document.getElementById('modalTheirScore').value) || 0;
 
-  gameLog.push({
+  const newGame = {
     id: Date.now().toString(), date, opp, loc, ourScore, theirScore,
     result: ourScore > theirScore ? 'W' : ourScore < theirScore ? 'L' : 'T',
     stats: { ...g }
-  });
+  };
+  gameLog.push(newGame);
 
   closeModal();
 
@@ -1052,6 +1163,9 @@ function confirmFinalize() {
   document.getElementById('gDate').valueAsDate = new Date();
   refreshAll();
   saveAll();
+
+  // Fire-and-forget sync to Google Sheets
+  syncGameToSheet(newGame);
 }
 
 // ════════════════════════════════════════
@@ -1363,6 +1477,261 @@ function sendReceipt() {
     });
   }
 }
+
+// ════════════════════════════════════════
+//  GOOGLE SHEETS INTEGRATION
+// ════════════════════════════════════════
+const LS_SHEETS   = 'courtstat_sheets';   // { apiKey, sheetId, tabName }
+const LS_SYNCLOG  = 'courtstat_synclog';  // array of log entries
+const LS_SYNCED   = 'courtstat_synced';   // set of game IDs already synced
+
+let sheetsConfig = { apiKey:'', sheetId:'', tabName:'Sheet1' };
+let syncLog      = [];
+let syncedIds    = new Set();
+
+function loadSheetsConfig() {
+  try {
+    const s = localStorage.getItem(LS_SHEETS);
+    if (s) sheetsConfig = { ...sheetsConfig, ...JSON.parse(s) };
+    const l = localStorage.getItem(LS_SYNCLOG);
+    if (l) syncLog = JSON.parse(l);
+    const i = localStorage.getItem(LS_SYNCED);
+    if (i) syncedIds = new Set(JSON.parse(i));
+  } catch(e) {}
+}
+
+function saveSheetsConfig() {
+  localStorage.setItem(LS_SHEETS,  JSON.stringify(sheetsConfig));
+  localStorage.setItem(LS_SYNCLOG, JSON.stringify(syncLog.slice(-50))); // keep last 50
+  localStorage.setItem(LS_SYNCED,  JSON.stringify([...syncedIds]));
+}
+
+// Build the row array that goes into the Sheet
+// Columns: Date | Opponent | H/A | Result | OurScore | TheirScore |
+//          PTS | REB | AST | STL | BLK | TO | PF |
+//          2FGM | 2FGA | 2FG% | 3PM | 3PA | 3P% | FGM | FGA | FG% | FTM | FTA | FT%
+function gameToRow(gm) {
+  const s   = gm.stats;
+  const pct = (m,a) => a>0 ? parseFloat((m/a*100).toFixed(1)) : 0;
+  const fgm = s.fg2m + s.fg3m;
+  const fga = s.fg2a + s.fg3a;
+  return [
+    gm.date,
+    gm.opp,
+    gm.loc === 'H' ? 'Home' : 'Away',
+    gm.result,
+    gm.ourScore,
+    gm.theirScore,
+    s.pts, s.reb, s.ast, s.stl, s.blk, s.to, s.foul,
+    s.fg2m, s.fg2a, pct(s.fg2m, s.fg2a),
+    s.fg3m, s.fg3a, pct(s.fg3m, s.fg3a),
+    fgm, fga, pct(fgm, fga),
+    s.ftm, s.fta, pct(s.ftm, s.fta)
+  ];
+}
+
+// Header row — written once when sheet is empty
+const SHEET_HEADERS = [
+  'Date','Opponent','H/A','Result','Our Score','Their Score',
+  'PTS','REB','AST','STL','BLK','TO','PF',
+  '2FGM','2FGA','2FG%','3PM','3PA','3P%','FGM','FGA','FG%','FTM','FTA','FT%'
+];
+
+async function appendToSheet(rows) {
+  const { apiKey, sheetId, tabName } = sheetsConfig;
+  if (!apiKey || !sheetId) throw new Error('Missing API key or Sheet ID. Go to Settings.');
+
+  const range  = encodeURIComponent(`${tabName}!A1`);
+  const url    = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS&key=${apiKey}`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: rows })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+
+async function getSheetRowCount() {
+  const { apiKey, sheetId, tabName } = sheetsConfig;
+  const range = encodeURIComponent(`${tabName}!A:A`);
+  const url   = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+  const res   = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data  = await res.json();
+  return (data.values || []).length;
+}
+
+function addSyncLog(msg, type='info') {
+  const ts  = new Date().toLocaleTimeString();
+  const icon = type==='ok' ? '✓' : type==='err' ? '✗' : '→';
+  syncLog.push(`${icon} ${ts}  ${msg}`);
+  saveSheetsConfig();
+  renderSyncLog();
+}
+
+function renderSyncLog() {
+  const el = document.getElementById('syncLog');
+  if (!el) return;
+  el.innerHTML = syncLog.length
+    ? [...syncLog].reverse().slice(0,20).map(l => `<div>${l}</div>`).join('')
+    : 'No sync activity yet.';
+}
+
+function setSyncIndicator(msg, type) {
+  const el = document.getElementById('syncIndicator');
+  if (!el) return;
+  const colors = { syncing:'var(--blue)', ok:'var(--green)', err:'var(--red)', '':'var(--muted)' };
+  el.innerHTML = msg ? `<span style="font-size:12px;color:${colors[type]||colors['']};letter-spacing:1px">${msg}</span>` : '';
+}
+
+// Called after every confirmFinalize — sync the new game to Sheets
+async function syncGameToSheet(gm) {
+  if (!sheetsConfig.apiKey || !sheetsConfig.sheetId) return; // not configured
+  if (syncedIds.has(gm.id)) return; // already synced
+
+  setSyncIndicator('⟳ Syncing to Google Sheets…', 'syncing');
+  addSyncLog(`Syncing game vs ${gm.opp} (${gm.date})…`);
+
+  try {
+    // Check if sheet is empty — if so, write headers first
+    const rowCount = await getSheetRowCount();
+    const rows = [];
+    if (rowCount === 0) rows.push(SHEET_HEADERS);
+    rows.push(gameToRow(gm));
+
+    await appendToSheet(rows);
+    syncedIds.add(gm.id);
+    saveSheetsConfig();
+    setSyncIndicator('✓ Synced to Google Sheets', 'ok');
+    addSyncLog(`Saved: ${gm.opp} ${gm.ourScore}–${gm.theirScore} (${gm.result}) — ${gm.stats.pts} pts`, 'ok');
+    setTimeout(() => setSyncIndicator('', ''), 4000);
+  } catch(e) {
+    setSyncIndicator('⚠ Sheets sync failed — saved locally', 'err');
+    addSyncLog(`Error: ${e.message}`, 'err');
+    setTimeout(() => setSyncIndicator('', ''), 5000);
+  }
+}
+
+// Sync all unsynced games at once
+async function syncAllToSheet() {
+  const unsynced = gameLog.filter(gm => !syncedIds.has(gm.id));
+  const statusEl = document.getElementById('settingsStatus');
+  if (!unsynced.length) {
+    statusEl.textContent = '✓ All games are already synced.';
+    statusEl.className = 'settings-status ok';
+    return;
+  }
+  statusEl.textContent = `⟳ Syncing ${unsynced.length} game(s)…`;
+  statusEl.className = 'settings-status info';
+
+  let ok = 0, fail = 0;
+  for (const gm of unsynced) {
+    try {
+      const rowCount = await getSheetRowCount();
+      const rows = [];
+      if (rowCount === 0 && ok === 0) rows.push(SHEET_HEADERS);
+      rows.push(gameToRow(gm));
+      await appendToSheet(rows);
+      syncedIds.add(gm.id);
+      ok++;
+      addSyncLog(`Synced: ${gm.opp} (${gm.date})`, 'ok');
+    } catch(e) {
+      fail++;
+      addSyncLog(`Failed: ${gm.opp} — ${e.message}`, 'err');
+    }
+  }
+  saveSheetsConfig();
+  if (fail === 0) {
+    statusEl.textContent = `✓ Synced ${ok} game(s) successfully.`;
+    statusEl.className = 'settings-status ok';
+  } else {
+    statusEl.textContent = `⚠ ${ok} synced, ${fail} failed. Check sync log.`;
+    statusEl.className = 'settings-status err';
+  }
+}
+
+// ════════════════════════════════════════
+//  SETTINGS UI
+// ════════════════════════════════════════
+function saveSheetSettings() {
+  sheetsConfig.apiKey  = document.getElementById('gsApiKey').value.trim();
+  sheetsConfig.sheetId = document.getElementById('gsSheetId').value.trim();
+  sheetsConfig.tabName = document.getElementById('gsTabName').value.trim() || 'Sheet1';
+  saveSheetsConfig();
+  const statusEl = document.getElementById('settingsStatus');
+  statusEl.textContent = '✓ Credentials saved to this device.';
+  statusEl.className = 'settings-status ok';
+  showSaveToast('Credentials saved');
+}
+
+async function testSheetConnection() {
+  const statusEl = document.getElementById('settingsStatus');
+  const preview  = document.getElementById('sheetPreview');
+  sheetsConfig.apiKey  = document.getElementById('gsApiKey').value.trim();
+  sheetsConfig.sheetId = document.getElementById('gsSheetId').value.trim();
+  sheetsConfig.tabName = document.getElementById('gsTabName').value.trim() || 'Sheet1';
+
+  if (!sheetsConfig.apiKey || !sheetsConfig.sheetId) {
+    statusEl.textContent = '⚠ Enter your API key and Sheet ID first.';
+    statusEl.className = 'settings-status err';
+    return;
+  }
+  statusEl.textContent = '⟳ Testing connection…';
+  statusEl.className = 'settings-status info';
+  preview.style.display = 'none';
+
+  try {
+    const rowCount = await getSheetRowCount();
+    statusEl.textContent = `✓ Connected! Sheet has ${rowCount} row(s). Ready to sync.`;
+    statusEl.className = 'settings-status ok';
+    preview.style.display = 'block';
+    preview.textContent = `Sheet ID : ${sheetsConfig.sheetId}\nTab      : ${sheetsConfig.tabName}\nRows     : ${rowCount}\nURL      : https://docs.google.com/spreadsheets/d/${sheetsConfig.sheetId}/edit`;
+    addSyncLog('Connection test passed', 'ok');
+  } catch(e) {
+    statusEl.textContent = `✗ Connection failed: ${e.message}`;
+    statusEl.className = 'settings-status err';
+    addSyncLog(`Connection test failed: ${e.message}`, 'err');
+  }
+}
+
+function populateSettingsFields() {
+  const k = document.getElementById('gsApiKey');
+  const s = document.getElementById('gsSheetId');
+  const t = document.getElementById('gsTabName');
+  if (k) k.value = sheetsConfig.apiKey  || '';
+  if (s) s.value = sheetsConfig.sheetId || '';
+  if (t) t.value = sheetsConfig.tabName || 'Sheet1';
+  renderSyncLog();
+}
+
+// ════════════════════════════════════════
+//  HOOK SHEETS SYNC INTO confirmFinalize
+// ════════════════════════════════════════
+// Wrap the original confirmFinalize to also trigger sheet sync
+const _origConfirmFinalize = confirmFinalize;
+// redefine inline below since we need access to the new game object
+
+// ════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION
+// ════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/courtstat/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// ════════════════════════════════════════
+//  BOOT — load sheets config + init
+// ════════════════════════════════════════
+loadSheetsConfig();
 
 // Close modal on overlay background click
 document.getElementById('finalizeModal').addEventListener('click', function(e) {
